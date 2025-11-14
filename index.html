@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>my_ajax.html</title>
+</head>
+<body>
+    <h1 class = "header">AJAX Example</h1><br>
+
+    <button onclick = "LoadData()">데이터 불러오기</button><br><br>
+
+    <button onclick = "openAddModal()" class = "address" id="saveButton">데이터 추가하기</button>
+    <div id="buttonArea"></div> <br><br>
+
+    <table>
+        <label id = "label"></label>
+    </table>
+
+    <div id="myModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">데이터 추가</h2>
+            
+            <div class="form-group">
+                <label>Name:</label>
+                <input type="text" id="name" placeholder="name">
+            </div>
+            
+            <div class="form-group">
+                <label>Age:</label>
+                <input type="text" id="age" placeholder="age">
+            </div>
+            
+            <div class="form-group">
+                <label>Major:</label>
+                <input type="text" id="major" placeholder="major">
+            </div>
+            
+            <div class="form-group">
+                <label>Number:</label>
+                <input type="text" id="number" placeholder="number">
+            </div>
+            
+            <div id="modalButtons">
+                <button onclick="SaveData()" id="saveButton">저장</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!--데이터를 수정하거나 삭제하시는 방법
+    1. 데이터 불러오기 버튼을 클릭 - 그렇게 되었을 경우 lable 태그 안에 데이터가 테이블 형식으로 나타나고, 수정 및 삭제가 가능한 버튼이 생성됩니다.
+    2. 수정하거나 삭제하고자 하는 데이터 행을 클릭 - 그렇게 되었을 경우 해당 데이터가 input 태그 안에 채워집니다.
+    3. 수정하기 또는 삭제하기 버튼 클릭 - 그렇게 되었을 경우 해당 데이터가 수정 또는 삭제됩니다.
+    -->
+
+
+    <script>
+        const API_URL = 'https://6915287a84e8bd126af8d72c.mockapi.io/users';
+        let currentEditId = null;
+
+        function LoadData(){
+            const xhr = new XMLHttpRequest();
+            
+            xhr.open('GET', API_URL, true);
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    
+                    let html = `
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                        <tr style="background-color: #ddd; font-weight: bold;">
+                            <th style="padding: 8px; text-align: left; width: 40px;">No.</th>
+                            <th style="padding: 8px; text-align: left;">Name</th>
+                            <th style="padding: 8px; text-align: left; width: 60px;">Age</th>
+                            <th style="padding: 8px; text-align: left;">Major</th>
+                            <th style="padding: 8px; text-align: left; width: 80px;">Number</th>
+                            <th style="padding: 8px; text-align: left; width: 100px;">Actions</th>
+                        </tr>
+                        </thead>
+                    <tbody>
+                `;
+
+                data.forEach((student, index) => {
+                     html += `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 8px;">${index + 1}</td>
+                            <td style="padding: 8px;">${student.name}</td>
+                            <td style="padding: 8px;">${student.age}</td>
+                            <td style="padding: 8px;">${student.major}</td>
+                            <td style="padding: 8px;">${student.student_number || '-'}</td>
+                            <td style="padding: 8px;">
+                                <button onclick="editStudent('${student.id}')" style="margin-right: 5px;">수정</button>
+                                <button onclick="deleteStudent('${student.id}')">삭제</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
+
+                document.getElementById('label').innerHTML = html;
+                
+                window.studentsData = data;
+                }
+            };
+            
+            xhr.send();
+        }
+
+        function editStudent(id) {
+            console.log('editStudent 호출됨, ID:', id); // 디버깅
+            console.log('현재 studentsData:', studentsData);
+
+            const student = studentsData.find(s => s.id === id);
+            if (student) {
+                openEditModal(student.id, student.name, student.age, student.major, student.student_number);
+            }
+        }
+
+        function deleteStudent(id) {
+            DeleteData(id);
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').innerText = '데이터 추가';
+            clearForm();
+            currentEditId = null;
+            
+            document.getElementById('modalButtons').innerHTML = 
+                `<button onclick="SaveData()">저장</button>
+                 <button onclick="closeModal()">취소</button>`;
+            
+            document.getElementById('myModal').style.display = 'block';
+        }
+
+        function openEditModal(id, name, age, major, studentNumber) {
+            document.getElementById('modalTitle').innerText = '데이터 수정';
+            
+            document.getElementById('name').value = name || '';
+            document.getElementById('age').value = age || '';
+            document.getElementById('major').value = major || '';
+            document.getElementById('number').value = studentNumber || '';
+            
+            currentEditId = id;
+            
+            document.getElementById('modalButtons').innerHTML = 
+                `<button onclick="UpdateData('${id}')">수정</button>
+                 <button onclick="closeModal()">취소</button>`;
+            
+            document.getElementById('myModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('myModal').style.display = 'none';
+            clearForm();
+            currentEditId = null;
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('myModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        function SaveData(){
+            const name = document.getElementById('name').value;
+            const age = document.getElementById('age').value;
+            const major = document.getElementById('major').value;
+            const number = document.getElementById('number').value;
+
+            if (!name || !age || !major || !number) {
+                alert('모든 필드를 입력해주세요!');
+                return;
+            }
+
+            const studentData = {
+                name: name,
+                age: age,
+                major: major,
+                student_number: number
+            };
+
+            const xhr = new XMLHttpRequest();
+            
+            xhr.open('POST', API_URL, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && (xhr.status === 200 || xhr.status === 201)) {
+                    const data = JSON.parse(xhr.responseText);
+                    console.log('Success:', data);
+                    alert('저장되었습니다!');
+                    LoadData();
+                    closeModal(); 
+                }
+            };
+            
+            xhr.send(JSON.stringify(studentData));
+        }
+
+        function UpdateData(id){  
+            const name = document.getElementById('name').value;
+            const age = document.getElementById('age').value;
+            const major = document.getElementById('major').value;
+            const number = document.getElementById('number').value;
+
+            if (!name || !age || !major || !number) {
+                alert('모든 필드를 입력해주세요!');
+                return;
+            }
+
+            const studentData = {
+                name: name,
+                age: parseInt(age),
+                major: major,
+                student_number: number
+            };
+
+            const xhr = new XMLHttpRequest();
+            
+            xhr.open('PUT', `${API_URL}/${id}`, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    console.log('수정 성공:', data);
+                    alert('수정되었습니다!'); 
+                    LoadData();
+                    closeModal(); 
+                }
+            };
+            
+            xhr.send(JSON.stringify(studentData));
+        }
+
+        function DeleteData(id){
+            if (!confirm('정말 삭제하시겠습니까?')) {
+                return;
+            }
+            
+            const xhr = new XMLHttpRequest();
+            
+            xhr.open('DELETE', `${API_URL}/${id}`, true);
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && (xhr.status === 200 || xhr.status === 204)) {
+                    console.log('삭제 성공');
+                    alert('삭제되었습니다!'); 
+                    LoadData();
+                }
+            };
+            
+            xhr.send();
+        }
+
+        function clearForm() {
+            document.getElementById('name').value = '';
+            document.getElementById('age').value = '';
+            document.getElementById('major').value = '';
+            document.getElementById('number').value = '';
+        }
+    </script>
+
+    <style>
+        header{
+            background-color: #f1f1f1;
+            padding: 20px;
+            text-align: center;
+        }
+
+        label{
+            width : 700px;
+            height: 300px;          
+            overflow-y: auto;
+            display : block;
+            background-color : lightyellow;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 30px;
+            border: 1px solid #888;
+            border-radius: 10px;
+            width: 400px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            width: auto;
+            height: auto;
+            background-color: transparent;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        #modalButtons {
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        #modalButtons button {
+            padding: 10px 20px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #modalButtons button:first-child {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        #modalButtons button:first-child:hover {
+            background-color: #45a049;
+        }
+
+        #modalButtons button:last-child {
+            background-color: #f44336;
+            color: white;
+        }
+
+        #modalButtons button:last-child:hover {
+            background-color: #da190b;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background-color: #f0f0f0;
+        }
+
+        button:hover {
+            background-color: #e0e0e0;
+        }
+    </style>
+</body>
+</html>
